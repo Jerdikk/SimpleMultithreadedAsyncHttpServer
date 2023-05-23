@@ -94,12 +94,14 @@ namespace SimpleMultithreadedAsuncHttpServer
 
         private async Task SendResponse(HttpResponseMessage response)
         {
+            // сначала пишем header
             using (StreamWriter sw = new StreamWriter(_stream, leaveOpen: true))
             {
                 sw.WriteLine($"HTTP/{response.Version} {(int)response.StatusCode} {response.ReasonPhrase}");
                 sw.Write(response.Headers);
                 sw.WriteLine(response.Content?.Headers.ToString() ?? "");
             }
+            // затем пишем content
             if (response.Content != null)
                 await response.Content.CopyToAsync(_stream);
         }
