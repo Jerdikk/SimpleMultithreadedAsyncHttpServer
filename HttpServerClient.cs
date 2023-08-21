@@ -2,9 +2,41 @@
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System;
+using System.Xml;
 
 namespace SimpleMultithreadedAsuncHttpServer
 {
+    public class MyTouch
+    {
+        public float x;
+        public float y;
+        public int countTap;
+        public int button;
+        public int pointer;
+
+        public MyTouch()
+        {
+        }
+
+        public MyTouch(float x, float y, int countTap, int button, int pointer)
+        {
+            this.x = x;
+            this.y = y;
+            this.countTap = countTap;
+            this.button = button;
+            this.pointer = pointer;
+        }
+
+        public MyTouch copy()
+        {
+            return new MyTouch(this.x, this.y, this.countTap, this.button, this.pointer);
+        }
+    }
+
+
+
     class HttpServerClient : IDisposable
     {
         private readonly TcpClient _client;
@@ -12,6 +44,7 @@ namespace SimpleMultithreadedAsuncHttpServer
         private readonly EndPoint _remoteEndPoint;
         private readonly Task _clientTask;
         private readonly Action<HttpServerClient> _disposeCallback;
+        
 
         public HttpServerClient(TcpClient client, Action<HttpServerClient> disposeCallback)
         {
@@ -34,7 +67,12 @@ namespace SimpleMultithreadedAsuncHttpServer
                     if (request != null)
                         Console.WriteLine($"<< {request.Method.Method} {request.RequestUri}");
                     else
+                    {
                         Console.WriteLine($"<< ??");
+                        break;
+                    }
+
+
                     //Console.WriteLine(request);
                     using HttpResponseMessage response = new HttpResponseMessage(status);
                     if (request != null)
@@ -44,17 +82,49 @@ namespace SimpleMultithreadedAsuncHttpServer
                         response.Headers.Connection.Add("close");
                     if (status == HttpStatusCode.OK)
                     {
-                        if (request.RequestUri.ToString() == "/")
+
+                        if (request.Method.Method == "GET")
                         {
-                            Console.WriteLine(">> /");
-                            response.Content = CreateHtmlContent($"<html><head><title>Главная страница</title></head><body>Привет, {_remoteEndPoint}!</body></html>");
+                            if (request.RequestUri.ToString() == "/")
+                            {
+                                Console.WriteLine(">> /");
+                                response.Content = CreateHtmlContent($"<html><head><title>Главная страница</title></head><body>Привет, {_remoteEndPoint}!</body></html>");
+                            }
+                            else
+                            {
+                                response.StatusCode = HttpStatusCode.NotFound;
+                                Console.WriteLine($">> {(int)response.StatusCode} {response.ReasonPhrase}");
+                                response.Content = CreateHtmlContent(string.Format(errorTemplate, $"{(int)response.StatusCode} {response.ReasonPhrase}"));
+                            }
                         }
-                        else
+                        else if (request.Method.Method == "POST")
                         {
-                            response.StatusCode = HttpStatusCode.NotFound;
-                            Console.WriteLine($">> {(int)response.StatusCode} {response.ReasonPhrase}");
-                            response.Content = CreateHtmlContent(string.Format(errorTemplate, $"{(int)response.StatusCode} {response.ReasonPhrase}"));
+                            String? content;
+                            if (request.Content != null)
+                            {
+                                HttpContent httpContent = request.Content;
+                                content = await httpContent.ReadAsStringAsync();
+
+                                if ((content != null) && (content.Length > 0))
+                                {
+                                    try
+                                    {
+                                        XmlDocument xDoc = new XmlDocument();
+                                        xDoc.LoadXml(content);
+                                        response.Content = CreateHtmlContent($"<?xml version=\"1.0\" encoding=\"utf-8\" ?><Object><Class ID=\"1\" Name=\"MyClass\"></Class></Object>");
+                                    }
+                                    catch (Exception e) 
+                                    {
+                                        int yy = 1;
+                                    }
+                                }
+
+
+                                Console.WriteLine($">> {content}");
+                            }
+                            int t = 1;
                         }
+
                     }
                     else
                     {
@@ -112,21 +182,35 @@ namespace SimpleMultithreadedAsuncHttpServer
             {
                 HttpRequestMessage request = new HttpRequestMessage();
                 string requestHeader = await ReadLineAsync().ConfigureAwait(false);
+                if (requestHeader == null)
+                {
+                    return (null, HttpStatusCode.FailedDependency);
+                }
                 string[] headerTokens = requestHeader.Split(" ");
+
                 if (headerTokens.Length != 3)
                     return (null, HttpStatusCode.BadRequest);
+
                 request.Method = new HttpMethod(headerTokens[0]);
                 request.RequestUri = new Uri(headerTokens[1], UriKind.Relative);
                 string[] protocolTokens = headerTokens[2].Split('/');
+
                 if (protocolTokens.Length != 2 || protocolTokens[0] != "HTTP")
                     return (null, HttpStatusCode.BadRequest);
+
                 request.Version = Version.Parse(protocolTokens[1]);
                 MemoryStream ms = new MemoryStream();
                 HttpContent content = new StreamContent(ms);
                 request.Content = content;
+
+
                 while (true)
                 {
                     string headerLine = await ReadLineAsync().ConfigureAwait(false);
+                    if (headerLine == null)
+                    {
+                        return (null, HttpStatusCode.FailedDependency);
+                    }
                     if (headerLine.Length == 0)
                         break;
                     string[] tokens = headerLine.Split(":", 2);
@@ -201,7 +285,9 @@ namespace SimpleMultithreadedAsuncHttpServer
                 switch (b)
                 {
                     case -1:
-                        throw new HttpRequestException("Подключение разорвано.");
+                        Console.WriteLine("Подключение: разорвано.");
+                        return null;
+                        break;
                     case '\r':
                         if (lineState == LineState.None)
                             lineState = LineState.CR;
