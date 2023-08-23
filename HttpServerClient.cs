@@ -88,7 +88,7 @@ namespace SimpleMultithreadedAsuncHttpServer
                             if (request.RequestUri.ToString() == "/")
                             {
                                 Console.WriteLine(">> /");
-                                response.Content = CreateHtmlContent($"<html><head><title>Главная страница</title></head><body>Привет, {_remoteEndPoint}!</body></html>");
+                                response.Content = CreateHtmlContent($"<?xml version=\"1.0\" encoding=\"utf-8\" ?><Protocol Version=\"1\" Name=\"MyProto\" />");
                             }
                             else
                             {
