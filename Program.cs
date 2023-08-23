@@ -1,5 +1,8 @@
-﻿namespace SimpleMultithreadedAsuncHttpServer
+﻿using System.Xml.Serialization;
+
+namespace SimpleMultithreadedAsuncHttpServer
 {
+
     class Program
     {
         static async Task Main(string[] args)
