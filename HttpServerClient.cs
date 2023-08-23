@@ -39,20 +39,25 @@ namespace SimpleMultithreadedAsuncHttpServer
 
     class HttpServerClient : IDisposable
     {
+        private long _clientID;
         private readonly TcpClient _client;
         private readonly NetworkStream _stream;
         private readonly EndPoint _remoteEndPoint;
         private readonly Task _clientTask;
         private readonly Action<HttpServerClient> _disposeCallback;
         
-
-        public HttpServerClient(TcpClient client, Action<HttpServerClient> disposeCallback)
+        public long GetClientID()
+        {
+            return _clientID;
+        }
+        public HttpServerClient(TcpClient client, Action<HttpServerClient> disposeCallback, long clientID)
         {
             _client = client;
             _stream = client.GetStream();
             _remoteEndPoint = client.Client.RemoteEndPoint;
             _disposeCallback = disposeCallback;
             _clientTask = RunReadingLoop();
+            _clientID = clientID;
         }
 
         const string errorTemplate = "<html><head><title>{0}</title></head><body><center><h1>{0}</h1></center><hr><center>TcpListener server</center></body></html>";
@@ -88,7 +93,8 @@ namespace SimpleMultithreadedAsuncHttpServer
                             if (request.RequestUri.ToString() == "/")
                             {
                                 Console.WriteLine(">> /");
-                                response.Content = CreateHtmlContent($"<?xml version=\"1.0\" encoding=\"utf-8\" ?><Protocol Version=\"1\" Name=\"MyProto\" />");
+                                response.Content = CreateHtmlContent($"<?xml version=\"1.0\" encoding=\"utf-8\" ?><Protocol Version=\"1.0\" Name=\"MyProto\" ID=\"{_clientID}\"/>");
+                                int tt = 1;
                             }
                             else
                             {
@@ -145,6 +151,7 @@ namespace SimpleMultithreadedAsuncHttpServer
             }
             catch (IOException)
             {
+                _stream.Close();
                 Console.WriteLine("Подключение к " + _remoteEndPoint + " закрыто сервером.");
             }
             catch (Exception ex)

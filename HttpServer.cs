@@ -7,11 +7,17 @@ namespace SimpleMultithreadedAsuncHttpServer
     {
         private readonly TcpListener _listener;
         private readonly List<HttpServerClient> _clients;
+        private long _clientID;
+        public CancellationTokenSource source;
+        public CancellationToken token; 
 
         public HttpServer(int port)
         {
             _listener = new TcpListener(IPAddress.Any, port);
             _clients = new List<HttpServerClient>();
+            _clientID = 0;
+            source = new CancellationTokenSource();
+            token = source.Token;
         }
 
         public async Task ListenAsync()
@@ -24,14 +30,19 @@ namespace SimpleMultithreadedAsuncHttpServer
                 {
                     try
                     {
-                        TcpClient client = await _listener.AcceptTcpClientAsync();
+                        TcpClient client = await _listener.AcceptTcpClientAsync(token);
                         Console.WriteLine("Подключение: " + client.Client.RemoteEndPoint + " > " + client.Client.LocalEndPoint);
                         lock (_clients)
                         {
-                            _clients.Add(new HttpServerClient(client, c => { lock (_clients) { _clients.Remove(c); } c.Dispose(); }));
+                            _clients.Add(new HttpServerClient(client, c => { lock (_clients) { _clients.Remove(c); } c.Dispose(); },_clientID));
+                            _clientID++;
                         }
                     }
-                    catch (Exception ex) { Console.WriteLine(ex.Message); break; }
+                    catch (Exception ex) 
+                    { 
+                        Console.WriteLine(ex.Message); 
+                        break; 
+                    }
                 }
             }
             catch (ObjectDisposedException ex)
@@ -41,6 +52,8 @@ namespace SimpleMultithreadedAsuncHttpServer
                 else
                     throw ex;
             }
+            source.Dispose();
+            Console.WriteLine("Сервер остановлен нормально.");
         }
 
         public void Stop()

@@ -13,6 +13,7 @@
                     if (input == "stop")
                     {
                         Console.WriteLine("Остановка сервера...");
+                        server.source.Cancel();
                         server.Stop();
                         break;
                     }
